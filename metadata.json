@@ -1,0 +1,6 @@
+{
+  "name": "ThesisCraft OS",
+  "description": "Premium academic document architect generating rubric-compliant SRS, SDS, and Project Proposals for CS, SE, and Data Science university students.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  body {
+    font-family: var(--font-sans);
+    background-color: #121212;
+    color: #B3B3B3;
+  }
+}
+
+/* Monochrome surfaces */
+.surface-card {
+  background-color: #1E1E1E;
+  border: 1px solid #2D2D2D;
+}
+
+.surface-subtle {
+  background-color: #181818;
+  border: 1px solid #282828;
+}
+
+.surface-elevated {
+  background-color: #242424;
+  border: 1px solid #383838;
+}
+
+/* Light mode overrides when html has class 'light' */
+html.light body {
+  background-color: #F8F9FA;
+  color: #4A4A4A;
+}
+
+html.light .surface-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E5E5E5;
+}
+
+html.light .surface-subtle {
+  background-color: #F4F4F5;
+  border: 1px solid #E4E4E7;
+}
+
+html.light .surface-elevated {
+  background-color: #FFFFFF;
+  border: 1px solid #D4D4D8;
+}
+
+/* Custom Minimal Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #141414;
+}
+
+html.light ::-webkit-scrollbar-track {
+  background: #F0F0F0;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3A3A3A;
+  border-radius: 2px;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #C4C4C4;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555555;
+}
