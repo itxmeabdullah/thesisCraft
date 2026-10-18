@@ -145,6 +145,66 @@ app.post('/api/generate', async (req, res) => {
   }
 });
 
+// Structured IEEE Document Object Endpoint (Gemini JSON Output)
+app.post('/api/generate-ieee-json', async (req, res) => {
+  try {
+    const wizardData = req.body;
+    const { buildIEEEStructuredPrompt, createDefaultIEEEDocumentObject } = await import('./src/utils/ieeeJsonGenerator.ts');
+    
+    const clientApiKey = (req.body.apiKey as string) || (req.headers['x-api-key'] as string) || process.env.GEMINI_API_KEY;
+    let activeAi = aiClient;
+    if (clientApiKey && clientApiKey !== process.env.GEMINI_API_KEY && clientApiKey !== 'MY_GEMINI_API_KEY') {
+      try {
+        activeAi = new GoogleGenAI({
+          apiKey: clientApiKey,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build',
+            },
+          },
+        });
+      } catch (e) {
+        console.warn('Failed to initialize custom client API key');
+      }
+    }
+
+    if (activeAi) {
+      try {
+        const { systemInstruction, userPrompt } = buildIEEEStructuredPrompt(wizardData);
+
+        const response = await activeAi.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: userPrompt,
+          config: {
+            systemInstruction,
+            responseMimeType: 'application/json',
+            temperature: 0.2,
+          },
+        });
+
+        const rawJsonText = response.text || '';
+        if (rawJsonText) {
+          const parsed = JSON.parse(rawJsonText);
+          if (parsed.documentTitle && parsed.page1 && parsed.page2) {
+            parsed.isUnlocked = false;
+            return res.json(parsed);
+          }
+        }
+      } catch (geminiError: any) {
+        console.warn('Gemini structured JSON generation failed or hit quota, using deterministic IEEE object:', geminiError?.message);
+      }
+    }
+
+    // Deterministic fallback
+    const fallbackObj = createDefaultIEEEDocumentObject(wizardData);
+    return res.json(fallbackObj);
+  } catch (err: any) {
+    console.error('Error in /api/generate-ieee-json:', err);
+    const { createDefaultIEEEDocumentObject } = await import('./src/utils/ieeeJsonGenerator.ts');
+    return res.json(createDefaultIEEEDocumentObject(req.body));
+  }
+});
+
 // Mount Vite or serve static assets
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {

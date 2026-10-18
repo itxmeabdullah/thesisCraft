@@ -1,38 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { TopNav } from './components/TopNav';
-import { Sidebar } from './components/Sidebar';
-import { RubricTrackersPanel } from './components/RubricTrackersPanel';
-import { DocumentEnginePanel } from './components/DocumentEnginePanel';
-import { ProjectInputs, GeneratedDocument, RubricTrackerItem } from './types';
-import { generateAcademicDocument } from './utils/fallbackAcademicGenerator';
-
-const INITIAL_RUBRIC_TRACKERS: RubricTrackerItem[] = [
-  { id: 'problem-scope', title: 'Problem Scope Formulation', description: 'Domain context, bottlenecks & quantifiable research hypotheses', verified: false },
-  { id: 'baseline-def', title: 'Baseline Definition & SOTA', description: 'Comparative benchmark against leading commercial & academic systems', verified: false },
-  { id: 'sys-boundaries', title: 'System Boundaries', description: 'Explicit In-Scope vs Out-of-Scope modular boundaries', verified: false },
-  { id: 'ieee-syntax', title: 'IEEE-830 / 1016 RFC 2119 Rigor', description: 'Formal [SHALL, SHOULD, MUST] keyword compliance', verified: false },
-  { id: 'db-schema', title: 'Database & Schema Normalization', description: '3NF relational schemas with DDL, UUIDs & indexes', verified: false },
-  { id: 'risk-matrix', title: 'Risk Prioritization Matrix', description: 'Likelihood x Impact scoring table with concrete contingency', verified: false },
-  { id: 'feasibility', title: 'Feasibility & KPIs Verification', description: 'Target throughput, P99 latency bounds & MTBF reliability', verified: false },
-];
+import { 
+  Sparkles, ArrowRight, FileText, CheckCircle2, 
+  ShieldCheck, Database, Award, Lock, BookOpen, 
+  Terminal, Sun, Moon, Cpu 
+} from 'lucide-react';
+import { WizardModal } from './components/WizardModal';
+import { IEEE2PagePreview } from './components/IEEE2PagePreview';
+import { PaymentModal } from './components/PaymentModal';
+import { IEEEDocumentObject, WizardFormData } from './types';
+import { createDefaultIEEEDocumentObject } from './utils/ieeeJsonGenerator';
 
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(true);
-
-  // Form Inputs State
-  const [inputs, setInputs] = useState<ProjectInputs>({
-    title: 'EdgeVision: Real-Time Anomaly Detection on UAV Edge Hardware for High-Voltage Transmission Lines',
-    techStack: 'Python, PyTorch, TensorRT, FastAPI, PostgreSQL, Docker',
-    department: 'BS Computer Science',
-    documentMode: 'proposal',
-    apiKey: '',
-  });
-
-  const [document, setDocument] = useState<GeneratedDocument | null>(null);
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [rubricTrackers, setRubricTrackers] = useState<RubricTrackerItem[]>(INITIAL_RUBRIC_TRACKERS);
+  const [document, setDocument] = useState<IEEEDocumentObject | null>(null);
 
-  // Handle Theme Toggle
+  // Default sample for immediate exploration if user wants
+  const defaultSampleData: WizardFormData = {
+    title: 'EdgeVision-UAV: Autonomous Thermal & Visual Defect Detection for High-Voltage Lines',
+    problemStatement: 'Insulator flashovers and structural conductor fatigue cause unpredicted grid blackouts; current manual inspection is hazardous and delayed.',
+    domain: 'Artificial Intelligence & Machine Learning',
+    coreLanguagesAndFrameworks: 'Python, PyTorch, TensorRT, FastAPI, React, Docker',
+    databaseArchitecture: 'PostgreSQL 16 & TimescaleDB',
+    targetDeployment: 'Docker Containers on NVIDIA Jetson Edge',
+    documentMode: 'SRS',
+    universityStandard: 'HEC National Standard (OBE / Washington Accord)',
+    degreeProgram: 'BS Computer Science',
+    authors: 'M. Abdullah, S. Ahmed',
+    supervisor: 'Dr. Tariq Mahmood (Associate Professor)',
+    includeSDG: true,
+    includeSOTABaseline: true,
+    includeRiskMatrix: true,
+    includeSQLSchema: true,
+  };
+
   const handleToggleTheme = () => {
     setIsDarkMode((prev) => {
       const next = !prev;
@@ -51,160 +54,204 @@ export default function App() {
     window.document.documentElement.classList.add('dark');
   }, []);
 
-  // Update input fields
-  const handleInputChange = (updated: Partial<ProjectInputs>) => {
-    setInputs((prev) => ({ ...prev, ...updated }));
-  };
-
-  // Build Document Blueprint (Core Trigger)
-  const handleBuildBlueprint = async () => {
-    if (!inputs.title.trim() || isGenerating) return;
-
+  // Handler for completing the 5-step modal wizard
+  const handleWizardSubmit = async (formData: WizardFormData) => {
     setIsGenerating(true);
 
-    const techArray = inputs.techStack
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
-
-    const payload = {
-      title: inputs.title,
-      domain: inputs.department.includes('Data Science') 
-        ? 'Data Science & Artificial Intelligence' 
-        : inputs.department.includes('Software') 
-        ? 'Full-Stack Web & Enterprise SaaS' 
-        : 'Artificial Intelligence & Machine Learning',
-      degreeLevel: inputs.department,
-      techStack: techArray.length > 0 ? techArray : ['Python', 'FastAPI', 'PostgreSQL'],
-      documentMode: inputs.documentMode,
-      rubricPreset: 'hec-obe',
-      apiKey: inputs.apiKey || undefined,
-    };
-
     try {
-      const response = await fetch('/api/generate', {
+      const response = await fetch('/api/generate-ieee-json', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(inputs.apiKey ? { 'x-api-key': inputs.apiKey } : {}),
-        },
-        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
       });
 
       if (!response.ok) {
         throw new Error(`Server returned HTTP ${response.status}`);
       }
 
-      const data = await response.json();
-
-      setDocument({
-        title: data.title,
-        mode: data.mode,
-        markdown: data.markdown,
-        wordCount: data.wordCount || data.markdown.split(/\s+/).length,
-        sectionsCount: data.sectionsCount || 8,
-        generatedAt: data.generatedAt || new Date().toISOString(),
-        isUnlocked: false,
-        rubricTrackers: data.rubricTrackers || INITIAL_RUBRIC_TRACKERS.map(t => ({ ...t, verified: true, score: 96 })),
-      });
-
-      setRubricTrackers(
-        INITIAL_RUBRIC_TRACKERS.map((tracker) => ({
-          ...tracker,
-          verified: true,
-          score: Math.floor(94 + Math.random() * 5),
-        }))
-      );
+      const ieeeDoc: IEEEDocumentObject = await response.json();
+      setDocument(ieeeDoc);
+      setIsWizardOpen(false);
     } catch (err) {
-      console.warn('API call encountered issue, deploying local academic generator:', err);
-      const fallbackDoc = generateAcademicDocument({
-        title: payload.title,
-        domain: payload.domain as any,
-        degreeLevel: payload.degreeLevel as any,
-        techStack: payload.techStack,
-        documentMode: payload.documentMode as any,
-        rubricPreset: 'hec-obe',
-        injectSDG: true,
-        generateEvaluationMetrics: true,
-        includeRiskMatrix: true,
-      });
-
-      setDocument({
-        title: fallbackDoc.title,
-        mode: fallbackDoc.mode,
-        markdown: fallbackDoc.markdown,
-        wordCount: fallbackDoc.wordCount,
-        sectionsCount: fallbackDoc.sectionsCount,
-        generatedAt: fallbackDoc.generatedAt,
-        isUnlocked: false,
-        rubricTrackers: INITIAL_RUBRIC_TRACKERS.map(t => ({ ...t, verified: true, score: 97 })),
-      });
-
-      setRubricTrackers(
-        INITIAL_RUBRIC_TRACKERS.map((tracker) => ({
-          ...tracker,
-          verified: true,
-          score: 97,
-        }))
-      );
+      console.warn('API call encountered an issue, generating deterministic IEEE document:', err);
+      const fallbackDoc = createDefaultIEEEDocumentObject(formData);
+      setDocument(fallbackDoc);
+      setIsWizardOpen(false);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Verify Paywall Action
-  const handleVerifyPaywall = () => {
+  const handleUnlockSuccess = () => {
     if (document) {
       setDocument({
         ...document,
         isUnlocked: true,
       });
     }
+    setIsPaymentModalOpen(false);
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#121212] text-[#B3B3B3] font-sans">
       
-      {/* 1. TOP NAVIGATION */}
-      <TopNav
-        apiKey={inputs.apiKey || ''}
-        onApiKeyChange={(k) => handleInputChange({ apiKey: k })}
-        isDarkMode={isDarkMode}
-        onToggleTheme={handleToggleTheme}
-      />
+      {/* HEADER NAVIGATION */}
+      <header className="h-14 border-b border-[#2D2D2D] bg-[#141414] px-4 sm:px-6 flex items-center justify-between gap-4 select-none shrink-0 sticky top-0 z-30">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded border border-white bg-white text-black flex items-center justify-center font-bold text-xs">
+              TC
+            </div>
+            <span className="font-bold text-white tracking-tight text-sm font-sans">
+              ThesisCraft OS
+            </span>
+            <span className="text-[10px] font-mono text-[#707070] border border-[#2D2D2D] px-1.5 py-0.5 rounded">
+              v2.4-IEEE
+            </span>
+          </div>
 
-      {/* Main Workspace: Left Sidebar + Split View Working Panels */}
-      <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-        
-        {/* 2. INPUT SIDEBAR */}
-        <Sidebar
-          inputs={inputs}
-          onChange={handleInputChange}
-          onSubmit={handleBuildBlueprint}
-          isGenerating={isGenerating}
-          onLoadPreset={(presetId) => {}}
-        />
+          <div className="h-4 w-[1px] bg-[#2D2D2D] hidden sm:block" />
 
-        {/* 3. MAIN WORKING PANELS (Split View) */}
-        <div className="flex-1 flex flex-col md:flex-row min-h-0 min-w-0">
-          
-          {/* Left Panel (Rubric Trackers) */}
-          <RubricTrackersPanel
-            trackers={rubricTrackers}
-            hasGenerated={!!document}
-            documentMode={inputs.documentMode}
-          />
-
-          {/* Right Panel (Live Content Engine) */}
-          <DocumentEnginePanel
-            document={document}
-            isGenerating={isGenerating}
-            onVerifyPaywall={handleVerifyPaywall}
-          />
-
+          {/* Status Indicator */}
+          <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-[#8C8C8C]">
+            <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse" />
+            <span>IEEE-830 Engine: Ready</span>
+          </div>
         </div>
 
-      </div>
+        {/* Header Actions */}
+        <div className="flex items-center gap-3">
+          {document ? (
+            <button
+              type="button"
+              onClick={() => setIsWizardOpen(true)}
+              className="px-3 py-1.5 rounded border border-[#333333] bg-[#1E1E1E] hover:bg-[#282828] text-white text-xs font-mono flex items-center gap-1.5 transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>New Specification</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsWizardOpen(true)}
+              className="px-4 py-1.5 rounded bg-white text-black text-xs font-bold hover:bg-[#E5E5E5] transition-colors flex items-center gap-1.5 cursor-pointer shadow-md"
+            >
+              <span>Try Now</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {/* Theme toggle */}
+          <button
+            type="button"
+            onClick={handleToggleTheme}
+            className="h-8 w-8 rounded border border-[#2D2D2D] bg-[#1E1E1E] text-[#B3B3B3] hover:text-white flex items-center justify-center transition-colors"
+            title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          >
+            {isDarkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      </header>
+
+      {/* MAIN VIEWPORT: Landing Hero vs 2-Page Document Preview */}
+      {!document ? (
+        <main className="flex-1 flex flex-col justify-center max-w-5xl mx-auto w-full px-6 py-12 sm:py-20 text-center space-y-12">
+          
+          {/* Hero Section */}
+          <div className="space-y-5 max-w-3xl mx-auto">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded border border-[#333333] bg-[#1A1A1A] text-xs font-mono text-white">
+              <span className="w-1.5 h-1.5 rounded-full bg-white" />
+              <span>IEEE-830 / IEEE-1016 / HEC-OBE Document Architect</span>
+            </div>
+
+            <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
+              Flawless Capstone & Thesis Specifications in Minutes.
+            </h1>
+
+            <p className="text-sm sm:text-base text-[#8C8C8C] leading-relaxed">
+              Designed specifically for Computer Science, Software Engineering, and Data Science university students. Click <strong>'Try Now'</strong> to launch the 5-step modal wizard, generate an IEEE-compliant document object via Gemini, and inspect a real-time 2-page PDF preview.
+            </p>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
+              <button
+                type="button"
+                onClick={() => setIsWizardOpen(true)}
+                className="w-full sm:w-auto px-8 py-3.5 rounded bg-white text-black font-bold text-sm hover:bg-[#E5E5E5] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xl"
+              >
+                <span>Try Now</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const sampleDoc = createDefaultIEEEDocumentObject(defaultSampleData);
+                  setDocument(sampleDoc);
+                }}
+                className="w-full sm:w-auto px-6 py-3.5 rounded border border-[#333333] bg-[#1E1E1E] text-white hover:bg-[#282828] text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+              >
+                <FileText className="w-4 h-4 text-[#8C8C8C]" />
+                <span>Explore Live Sample Preview</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 3 Core Workflow Pillars */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left pt-6 border-t border-[#262626]">
+            <div className="p-5 rounded border border-[#262626] bg-[#161616] space-y-2">
+              <span className="text-xs font-mono font-bold text-white uppercase block">
+                01. 5-Step Guided Wizard
+              </span>
+              <p className="text-xs text-[#8C8C8C] leading-relaxed">
+                Captures your project title, technical problem horizon, frameworks, target deployment, and university standard.
+              </p>
+            </div>
+
+            <div className="p-5 rounded border border-[#262626] bg-[#161616] space-y-2">
+              <span className="text-xs font-mono font-bold text-white uppercase block">
+                02. Structured Gemini Output
+              </span>
+              <p className="text-xs text-[#8C8C8C] leading-relaxed">
+                Generates a structured JSON object containing RFC 2119 keywords [SHALL/SHOULD/MUST], SOTA baselines, and PostgreSQL schemas.
+              </p>
+            </div>
+
+            <div className="p-5 rounded border border-[#262626] bg-[#161616] space-y-2">
+              <span className="text-xs font-mono font-bold text-white uppercase block">
+                03. Real-Time 2-Page PDF
+              </span>
+              <p className="text-xs text-[#8C8C8C] leading-relaxed">
+                Interactive dual-page A4 simulator with a free 1-page preview and instant PDF export via pdfMake.
+              </p>
+            </div>
+          </div>
+
+        </main>
+      ) : (
+        /* 2-PAGE REAL-TIME DOCUMENT PREVIEW (FREE PAGE 1 + LOCKED PAGE 2) */
+        <IEEE2PagePreview
+          document={document}
+          onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
+          onOpenWizard={() => setIsWizardOpen(true)}
+        />
+      )}
+
+      {/* 5-STEP MODAL WIZARD */}
+      <WizardModal
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        onSubmit={handleWizardSubmit}
+        isGenerating={isGenerating}
+      />
+
+      {/* PAYMENT MODAL (THE MONETIZATION ENGINE) */}
+      <PaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        onUnlockSuccess={handleUnlockSuccess}
+        projectTitle={document?.documentTitle || 'Academic Specification'}
+      />
 
     </div>
   );
