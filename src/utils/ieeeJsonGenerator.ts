@@ -46,6 +46,7 @@ The JSON must adhere strictly to this schema:
       "title": string,
       "architecturePattern": string,
       "componentTopology": string,
+      "mermaidDiagram": string,
       "databaseSchemaDDL": string
     },
     "sectionV_RiskMitigationMatrix": {
@@ -71,7 +72,17 @@ The JSON must adhere strictly to this schema:
     "obeScore": number,
     "ieeeSyntaxScore": number,
     "baselineRigorScore": number
-  }
+  },
+  "defenseQuestions": [
+    {
+      "id": string,
+      "question": string,
+      "focusArea": "Architecture & Tech Stack" | "Baseline Justification" | "Scalability & Latency" | "Failure Modes" | "Novelty Gap",
+      "defenseStrategy": string,
+      "modelAnswerGuideline": string,
+      "difficulty": "Tough" | "Probing" | "Critical"
+    }
+  ]
 }`;
 
   const userPrompt = `Generate the complete IEEE-compliant JSON document object for:
@@ -86,7 +97,9 @@ Degree Program: ${data.degreeProgram}
 Authors: ${data.authors}
 Supervisor: ${data.supervisor}
 
-Ensure all technical descriptions, SOTA baseline tables, RFC 2119 keywords, DDL SQL schemas, and Risk matrices are deeply detailed and relevant to this specific project.`;
+Ensure all technical descriptions, SOTA baseline tables, RFC 2119 keywords, DDL SQL schemas, and Risk matrices are deeply detailed and relevant to this specific project.
+IMPORTANT FOR DIAGRAMS: The "mermaidDiagram" field MUST contain a syntactically valid Mermaid.js string (e.g., starting with "graph TD" or "sequenceDiagram") with clear nodes and arrows representing the data flow and system architecture. Do not wrap the string in markdown ticks.
+IMPORTANT FOR DEFENSE PREP / VIVA SIMULATOR: Generate exactly 5 tough supervisor interrogation questions inside 'defenseQuestions' that examiners will ask about the student's chosen tech stack (${data.coreLanguagesAndFrameworks}), database (${data.databaseArchitecture}), and claimed SOTA baseline improvements. Include the focusArea, defenseStrategy (what the examiner is really testing), a concrete modelAnswerGuideline, and difficulty (Tough/Probing/Critical).`;
 
   return { systemInstruction, userPrompt };
 }
@@ -200,7 +213,17 @@ export function createDefaultIEEEDocumentObject(data: WizardFormData): IEEEDocum
       sectionIV_ArchitectureAndDataFlow: {
         title: 'System Architecture & Database DDL',
         architecturePattern: 'Hexagonal (Ports & Adapters) with Event-Driven Ingress',
-        componentTopology: 'Clients (Web/Mobile) -> NGINX Reverse Proxy -> API Gateway -> Ingestion Bus -> Asynchronous Compute Worker Pool -> PostgreSQL 16 Cluster + Redis Hot Cache',
+        componentTopology: 'Clients (Web/Mobile/Edge) -> NGINX Gateway -> Ingestion Worker Pool -> PostgreSQL 16 & Redis Mesh',
+        mermaidDiagram: `graph TD
+  Client[Client Layer: Web/Mobile/Edge] -->|TLS 1.3 HTTPS| Gateway[API Gateway & Rate Limiter]
+  Gateway --> Auth[Auth & RBAC Verifier]
+  Gateway --> Ingestion[Ingestion & Stream Validator]
+  Ingestion --> Stream[Queue / Redis Stream Bus]
+  Stream --> Workers[Analytical Compute Worker Pool]
+  Workers --> DB[(PostgreSQL 16 Primary DB)]
+  Workers --> Cache[(Redis Cache & Session State)]
+  Workers --> Dispatch[WebSocket Event Dispatcher]
+  Dispatch --> Client`,
         databaseSchemaDDL: `CREATE TABLE system_projects (
     project_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title VARCHAR(255) NOT NULL,
@@ -276,6 +299,48 @@ CREATE INDEX idx_projects_domain ON system_projects(domain);`
       ieeeSyntaxScore: 98.2,
       baselineRigorScore: 97.5
     },
+    defenseQuestions: [
+      {
+        id: 'VQ-01',
+        question: `Why did you select ${data.databaseArchitecture || 'PostgreSQL 16'} over a NoSQL document database (like MongoDB) or pure time-series store given the bursty nature of real-time telemetry?`,
+        focusArea: 'Architecture & Tech Stack',
+        defenseStrategy: 'Examiner is probing whether the student understands ACID transactional integrity, relational schema constraints, and B-Tree indexing vs eventual consistency.',
+        modelAnswerGuideline: 'Emphasize that the system requires strict referential integrity for verification audits, foreign-key relationships for artifact versions, and write-ahead logging (WAL) for durability. Hot time-series telemetry is buffered in Redis before batching into PostgreSQL with indexed timestamp partitions, preventing write lock contention.',
+        difficulty: 'Critical'
+      },
+      {
+        id: 'VQ-02',
+        question: 'Your SOTA baseline comparison table asserts a sub-38ms P99 deterministic latency. Under what exact concurrent synthetic load and network conditions was this validated?',
+        focusArea: 'Baseline Justification',
+        defenseStrategy: 'Examiner is checking whether the latency figure is theoretical speculation or empirically stress-tested under realistic socket congestion.',
+        modelAnswerGuideline: 'State that tests were benchmarked on a simulated cluster using Locust and JMeter with 5,000 concurrent worker threads injecting 10KB payloads. Explain that sub-38ms is achieved via zero-copy in-memory iterators and TensorRT engine serialization, avoiding runtime Python GIL overhead.',
+        difficulty: 'Tough'
+      },
+      {
+        id: 'VQ-03',
+        question: 'If the ingestion queue experiences an unprecedented 10x traffic spike (e.g. 50,000 req/sec), at which architectural tier does the system bottleneck first, and how does backpressure trigger?',
+        focusArea: 'Scalability & Latency',
+        defenseStrategy: 'Examiner is evaluating whether the student comprehends cascading failure points and dynamic queue saturation.',
+        modelAnswerGuideline: 'Acknowledge that worker thread pool saturation is the primary bottleneck. Explain the token-bucket rate limiter at the API gateway layer returning HTTP 429 Retry-After, while Redis stream consumers scale horizontally via consumer groups without dropping unacknowledged messages.',
+        difficulty: 'Probing'
+      },
+      {
+        id: 'VQ-04',
+        question: 'How does your architecture handle edge network disconnections or corrupted telemetry frames during live transmission?',
+        focusArea: 'Failure Modes',
+        defenseStrategy: 'Examiner is testing fault tolerance, cryptographic verification, and local edge caching resilience.',
+        modelAnswerGuideline: 'Explain that the edge node maintains a local ring buffer storing unsynchronized events with SHA-256 signatures. Upon TLS 1.3 reconnection, the client executes an idempotent sync protocol verifying Merkle root hashes against the master ledger.',
+        difficulty: 'Critical'
+      },
+      {
+        id: 'VQ-05',
+        question: `What is the concrete algorithmic novelty of this thesis over simply combining existing open-source libraries (${data.coreLanguagesAndFrameworks || 'FastAPI, PyTorch'})?`,
+        focusArea: 'Novelty Gap',
+        defenseStrategy: 'The classic defense trap: "Is this just standard application glue or legitimate engineering research?"',
+        modelAnswerGuideline: 'Distinguish between library integration and architectural formulation. State that the novelty lies in the specialized pipeline batching heuristic, deterministic state synchronization model, and verified throughput multipliers benchmarked against existing SOTA baselines.',
+        difficulty: 'Critical'
+      }
+    ],
     isUnlocked: false
   };
 }
@@ -327,6 +392,12 @@ ${doc.page1.sectionIII_SystemRequirements.functionalRequirements.map(f => `- **[
 - **Architectural Pattern:** ${doc.page2.sectionIV_ArchitectureAndDataFlow.architecturePattern}
 - **Component Topology:** ${doc.page2.sectionIV_ArchitectureAndDataFlow.componentTopology}
 
+### Architectural Topology (Mermaid.js Diagram)
+\`\`\`mermaid
+${doc.page2.sectionIV_ArchitectureAndDataFlow.mermaidDiagram || 'graph TD\n  Client[Client Layer] --> Gateway[API Gateway]\n  Gateway --> Workers[Worker Pool]\n  Workers --> DB[(Database)]'}
+\`\`\`
+
+### Production Database DDL (PostgreSQL 16)
 \`\`\`sql
 ${doc.page2.sectionIV_ArchitectureAndDataFlow.databaseSchemaDDL}
 \`\`\`
@@ -356,5 +427,17 @@ ${doc.page2.sectionVII_ConclusionAndTimeline.deliverables.map(d => `- ${d}`).joi
 
 ## References
 ${doc.page2.references.map((ref, idx) => `[${idx + 1}] ${ref}`).join('\n\n')}
+
+---
+
+## VIII. Defense Prep / Viva Simulator (Supervisor Interrogation)
+${(doc.defenseQuestions || []).map((q, idx) => `### Viva Question ${idx + 1} [${q.focusArea} — ${q.difficulty}]
+**Question:** ${q.question}  
+**Defense Strategy (Examiner Focus):** ${q.defenseStrategy}  
+**Model Defense Guideline:** ${q.modelAnswerGuideline}
+`).join('\n\n')}
 `;
 }
+
+export { convertIEEEDocumentToLaTeX, downloadLatexDocument } from './latexGenerator';
+

@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { 
   FileText, Download, Lock, Check, Copy, 
-  ZoomIn, ZoomOut, Sparkles, Shield, ArrowUpRight 
+  ZoomIn, ZoomOut, Sparkles, Shield, ArrowUpRight, HelpCircle, FileCode 
 } from 'lucide-react';
 import { IEEEDocumentObject } from '../types';
 import { generateIEEEDocumentPDF } from '../utils/pdfGenerator';
 import { convertIEEEDocumentToMarkdown } from '../utils/ieeeJsonGenerator';
+import { downloadLatexDocument } from '../utils/latexGenerator';
+import { MermaidRenderer } from './MermaidRenderer';
+import { DefensePrepCard } from './DefensePrepCard';
+import { RawLatexViewer } from './RawLatexViewer';
 
 interface IEEE2PagePreviewProps {
   document: IEEEDocumentObject;
@@ -18,6 +22,7 @@ export const IEEE2PagePreview: React.FC<IEEE2PagePreviewProps> = ({
   onOpenPaymentModal,
   onOpenWizard,
 }) => {
+  const [activeTab, setActiveTab] = useState<'preview' | 'latex'>('preview');
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [copiedMd, setCopiedMd] = useState(false);
 
@@ -69,12 +74,42 @@ export const IEEE2PagePreview: React.FC<IEEE2PagePreviewProps> = ({
             <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
               IEEE Document Simulator
             </span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-[#333333] bg-[#1E1E1E] text-[#999999]">
-              2-PAGE A4 PREVIEW
-            </span>
           </div>
 
-          <div className="hidden md:flex items-center gap-1.5 text-[11px] font-mono text-[#8C8C8C] pl-3 border-l border-[#262626]">
+          {/* Output Pane Tabs: 2-Page Preview & Raw LaTeX (.tex) */}
+          <div className="flex items-center rounded border border-[#333333] bg-[#181818] p-0.5" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'preview'}
+              onClick={() => setActiveTab('preview')}
+              className={`h-7 px-2.5 rounded text-xs font-mono font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeTab === 'preview'
+                  ? 'bg-white text-black shadow-sm'
+                  : 'text-[#8C8C8C] hover:text-white'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>2-Page Preview</span>
+            </button>
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'latex'}
+              onClick={() => setActiveTab('latex')}
+              className={`h-7 px-2.5 rounded text-xs font-mono font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeTab === 'latex'
+                  ? 'bg-white text-black shadow-sm'
+                  : 'text-[#8C8C8C] hover:text-white'
+              }`}
+            >
+              <FileCode className="w-3.5 h-3.5" />
+              <span>Raw LaTeX (.tex)</span>
+            </button>
+          </div>
+
+          <div className="hidden xl:flex items-center gap-1.5 text-[11px] font-mono text-[#8C8C8C] pl-2 border-l border-[#262626]">
             <span>Compliance:</span>
             <span className="text-white font-bold">{document.rubricScorecard.overallScore}%</span>
           </div>
@@ -82,69 +117,137 @@ export const IEEE2PagePreview: React.FC<IEEE2PagePreviewProps> = ({
 
         {/* Toolbar buttons */}
         <div className="flex items-center gap-2">
-          {/* Zoom controls */}
-          <div className="hidden lg:flex items-center border border-[#2D2D2D] rounded bg-[#1A1A1A] p-0.5">
-            <button
-              onClick={() => setZoomLevel(prev => Math.max(75, prev - 15))}
-              className="p-1 text-[#8C8C8C] hover:text-white"
-              title="Zoom Out"
-            >
-              <ZoomOut className="w-3.5 h-3.5" />
-            </button>
-            <span className="px-2 text-[10px] font-mono text-white">{zoomLevel}%</span>
-            <button
-              onClick={() => setZoomLevel(prev => Math.min(125, prev + 15))}
-              className="p-1 text-[#8C8C8C] hover:text-white"
-              title="Zoom In"
-            >
-              <ZoomIn className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          {activeTab === 'latex' ? (
+            <>
+              {/* Quick download .tex from toolbar */}
+              <button
+                type="button"
+                onClick={() => downloadLatexDocument(document)}
+                className="h-8 px-2.5 rounded border border-[#333333] bg-[#1E1E1E] hover:bg-[#262626] text-white text-xs font-mono flex items-center gap-1.5 transition-colors"
+                title="Download Clean .tex File"
+              >
+                <Download className="w-3.5 h-3.5 text-[#B3B3B3]" />
+                <span className="hidden sm:inline">Download .tex</span>
+              </button>
 
-          {/* Download Page 1 Free */}
-          <button
-            type="button"
-            onClick={handleDownloadPage1}
-            className="h-8 px-2.5 rounded border border-[#333333] bg-[#1E1E1E] hover:bg-[#262626] text-white text-xs font-mono flex items-center gap-1.5 transition-colors"
-            title="Download Free 1-Page PDF"
-          >
-            <Download className="w-3.5 h-3.5 text-[#B3B3B3]" />
-            <span className="hidden sm:inline">Page 1 PDF (Free)</span>
-          </button>
+              {/* Full PDF Export (Locked/Unlocked) */}
+              <button
+                type="button"
+                onClick={handleDownloadFullPDF}
+                className={`h-8 px-3 rounded text-xs font-mono font-semibold flex items-center gap-1.5 transition-colors ${
+                  document.isUnlocked
+                    ? 'bg-white text-black hover:bg-[#E5E5E5]'
+                    : 'border border-[#444444] bg-[#242424] text-white hover:border-white'
+                }`}
+              >
+                {document.isUnlocked ? (
+                  <>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Full 2-Page PDF</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Unlock Full PDF</span>
+                  </>
+                )}
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Zoom controls */}
+              <div className="hidden lg:flex items-center border border-[#2D2D2D] rounded bg-[#1A1A1A] p-0.5">
+                <button
+                  onClick={() => setZoomLevel(prev => Math.max(75, prev - 15))}
+                  className="p-1 text-[#8C8C8C] hover:text-white"
+                  title="Zoom Out"
+                >
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
+                <span className="px-2 text-[10px] font-mono text-white">{zoomLevel}%</span>
+                <button
+                  onClick={() => setZoomLevel(prev => Math.min(125, prev + 15))}
+                  className="p-1 text-[#8C8C8C] hover:text-white"
+                  title="Zoom In"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
+              </div>
 
-          {/* Full PDF Export (Locked/Unlocked) */}
-          <button
-            type="button"
-            onClick={handleDownloadFullPDF}
-            className={`h-8 px-3 rounded text-xs font-mono font-semibold flex items-center gap-1.5 transition-colors ${
-              document.isUnlocked
-                ? 'bg-white text-black hover:bg-[#E5E5E5]'
-                : 'border border-[#444444] bg-[#242424] text-white hover:border-white'
-            }`}
-          >
-            {document.isUnlocked ? (
-              <>
-                <Download className="w-3.5 h-3.5" />
-                <span>Full 2-Page PDF</span>
-              </>
-            ) : (
-              <>
-                <Lock className="w-3.5 h-3.5" />
-                <span>Unlock Full PDF</span>
-              </>
-            )}
-          </button>
+              {/* Download Page 1 Free */}
+              <button
+                type="button"
+                onClick={handleDownloadPage1}
+                className="h-8 px-2.5 rounded border border-[#333333] bg-[#1E1E1E] hover:bg-[#262626] text-white text-xs font-mono flex items-center gap-1.5 transition-colors"
+                title="Download Free 1-Page PDF"
+              >
+                <Download className="w-3.5 h-3.5 text-[#B3B3B3]" />
+                <span className="hidden sm:inline">Page 1 PDF (Free)</span>
+              </button>
 
-          {/* Markdown Copy/Export */}
-          <button
-            type="button"
-            onClick={handleCopyOrExportMarkdown}
-            className="h-8 px-2.5 rounded border border-[#333333] bg-[#1E1E1E] hover:bg-[#262626] text-white text-xs font-mono flex items-center gap-1 transition-colors"
-            title="Copy Raw Markdown"
-          >
-            {copiedMd ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5 text-[#B3B3B3]" />}
-            <span className="hidden md:inline">{copiedMd ? 'Copied' : 'Markdown'}</span>
-          </button>
+              {/* Jump to Diagram */}
+              <button
+                type="button"
+                onClick={() => {
+                  const el = window.document.getElementById('section-iv-architecture');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="h-8 px-2.5 rounded border border-[#333333] bg-[#1E1E1E] hover:bg-[#262626] text-white text-xs font-mono flex items-center gap-1.5 transition-colors"
+                title="Jump to Visual Architecture Topology"
+              >
+                <Shield className="w-3.5 h-3.5 text-[#CCCCCC]" />
+                <span className="hidden md:inline">Diagram</span>
+              </button>
+
+              {/* Jump to Defense Prep / Viva Simulator */}
+              <button
+                type="button"
+                onClick={() => {
+                  const el = window.document.getElementById('defense-prep-subcard');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="h-8 px-2.5 rounded border border-[#333333] bg-[#1E1E1E] hover:bg-[#262626] text-white text-xs font-mono flex items-center gap-1.5 transition-colors"
+                title="Jump to Viva Interrogation Questions"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-[#CCCCCC]" />
+                <span className="hidden lg:inline">Viva Simulator</span>
+              </button>
+
+              {/* Full PDF Export (Locked/Unlocked) */}
+              <button
+                type="button"
+                onClick={handleDownloadFullPDF}
+                className={`h-8 px-3 rounded text-xs font-mono font-semibold flex items-center gap-1.5 transition-colors ${
+                  document.isUnlocked
+                    ? 'bg-white text-black hover:bg-[#E5E5E5]'
+                    : 'border border-[#444444] bg-[#242424] text-white hover:border-white'
+                }`}
+              >
+                {document.isUnlocked ? (
+                  <>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Full 2-Page PDF</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Unlock Full PDF</span>
+                  </>
+                )}
+              </button>
+
+              {/* Markdown Copy/Export */}
+              <button
+                type="button"
+                onClick={handleCopyOrExportMarkdown}
+                className="h-8 px-2.5 rounded border border-[#333333] bg-[#1E1E1E] hover:bg-[#262626] text-white text-xs font-mono flex items-center gap-1 transition-colors"
+                title="Copy Raw Markdown"
+              >
+                {copiedMd ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5 text-[#B3B3B3]" />}
+                <span className="hidden md:inline">{copiedMd ? 'Copied' : 'Markdown'}</span>
+              </button>
+            </>
+          )}
 
           {/* Relaunch Wizard */}
           <button
@@ -159,8 +262,14 @@ export const IEEE2PagePreview: React.FC<IEEE2PagePreviewProps> = ({
         </div>
       </div>
 
-      {/* 2-PAGE DOCUMENT SIMULATOR VIEWPORT */}
-      <div className="flex-1 p-4 sm:p-8 flex flex-col items-center gap-8 overflow-x-auto">
+      {activeTab === 'latex' ? (
+        <RawLatexViewer 
+          document={document} 
+          onOpenPaymentModal={onOpenPaymentModal} 
+        />
+      ) : (
+        /* 2-PAGE DOCUMENT SIMULATOR VIEWPORT */
+        <div className="flex-1 p-4 sm:p-8 flex flex-col items-center gap-8 overflow-x-auto">
         
         {/* ================= PAGE 1 (FREE 1-PAGE PREVIEW) ================= */}
         <div 
@@ -293,15 +402,30 @@ export const IEEE2PagePreview: React.FC<IEEE2PagePreviewProps> = ({
           {/* Content Underneath (Blurred if locked) */}
           <div className={`space-y-4 text-justify font-serif ${!document.isUnlocked ? 'filter blur-[3.5px] select-none pointer-events-none' : ''}`}>
             
-            {/* SECTION IV */}
-            <div>
+            {/* SECTION IV: ARCHITECTURE, VISUAL TOPOLOGY & DDL */}
+            <div id="section-iv-architecture">
               <h2 className="text-[11.5px] font-bold uppercase tracking-wider text-black border-b border-slate-300 pb-0.5 mb-1.5 font-sans">
                 IV. {document.page2.sectionIV_ArchitectureAndDataFlow.title}
               </h2>
               <p className="text-[10px] text-slate-800 mb-1 font-sans">
                 <strong>Architectural Pattern: </strong>{document.page2.sectionIV_ArchitectureAndDataFlow.architecturePattern}
               </p>
+              <p className="text-[9.5px] text-slate-700 mb-2 font-sans">
+                {document.page2.sectionIV_ArchitectureAndDataFlow.componentTopology}
+              </p>
+
+              {/* LIVE MERMAID.JS VISUAL ARCHITECTURE DIAGRAM */}
+              <div className="my-2">
+                <MermaidRenderer 
+                  chart={document.page2.sectionIV_ArchitectureAndDataFlow.mermaidDiagram || 'graph TD\n  Client[Client Layer] --> Gateway[API Gateway]\n  Gateway --> Workers[Compute Workers]\n  Workers --> DB[(PostgreSQL)]'}
+                />
+              </div>
+
+              {/* Production Database Schema */}
               <div className="bg-slate-900 text-slate-200 p-2.5 rounded font-mono text-[8px] overflow-x-auto leading-relaxed mb-2">
+                <div className="text-[7.5px] font-sans text-slate-400 mb-1 font-bold uppercase tracking-wider">
+                  PostgreSQL 16 Production DDL
+                </div>
                 <pre>{document.page2.sectionIV_ArchitectureAndDataFlow.databaseSchemaDDL}</pre>
               </div>
             </div>
@@ -412,8 +536,15 @@ export const IEEE2PagePreview: React.FC<IEEE2PagePreviewProps> = ({
           </div>
         </div>
 
+        {/* DEFENSE PREP / VIVA SIMULATOR SUB-CARD IN LIVE OUTPUT PANEL */}
+        <div id="defense-prep-subcard" className="w-full max-w-[780px]">
+          <DefensePrepCard questions={document.defenseQuestions} />
+        </div>
+
       </div>
+      )}
 
     </div>
   );
 };
+

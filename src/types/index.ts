@@ -136,6 +136,7 @@ export interface IEEEDocumentObject {
       title: string;
       architecturePattern: string;
       componentTopology: string;
+      mermaidDiagram: string;
       databaseSchemaDDL: string;
     };
     sectionV_RiskMitigationMatrix: {
@@ -166,7 +167,17 @@ export interface IEEEDocumentObject {
     ieeeSyntaxScore: number;
     baselineRigorScore: number;
   };
+  defenseQuestions?: DefenseQuestion[];
   isUnlocked?: boolean;
+}
+
+export interface DefenseQuestion {
+  id: string;
+  question: string;
+  focusArea: 'Architecture & Tech Stack' | 'Baseline Justification' | 'Scalability & Latency' | 'Failure Modes' | 'Novelty Gap';
+  defenseStrategy: string;
+  modelAnswerGuideline: string;
+  difficulty: 'Tough' | 'Probing' | 'Critical';
 }
 
 export interface WizardFormData {

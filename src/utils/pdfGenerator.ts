@@ -3,6 +3,13 @@ import pdfFonts from 'pdfmake/build/vfs_fonts';
 import { IEEEDocumentObject } from '../types';
 
 // Initialize pdfMake virtual file system for fonts
+const defaultFontDescriptors = {
+  normal: 'Roboto-Regular.ttf',
+  bold: 'Roboto-Medium.ttf',
+  italics: 'Roboto-Italic.ttf',
+  bolditalics: 'Roboto-MediumItalic.ttf'
+};
+
 try {
   const vfs = 
     (pdfFonts as any)?.pdfMake?.vfs || 
@@ -14,6 +21,12 @@ try {
   if (vfs) {
     (pdfMake as any).vfs = vfs;
   }
+  (pdfMake as any).fonts = {
+    Roboto: defaultFontDescriptors,
+    Courier: defaultFontDescriptors,
+    Helvetica: defaultFontDescriptors,
+    Times: defaultFontDescriptors,
+  };
 } catch (e) {
   console.warn('PDFMake vfs font initialization warning:', e);
 }
@@ -23,6 +36,15 @@ export function generateIEEEDocumentPDF(doc: IEEEDocumentObject, onlyPage1: bool
     const docDefinition: any = {
       pageSize: 'A4',
       pageMargins: [36, 40, 36, 40], // 0.5 inch margins for IEEE style
+      defaultStyle: {
+        font: 'Roboto'
+      },
+      fonts: {
+        Roboto: defaultFontDescriptors,
+        Courier: defaultFontDescriptors,
+        Helvetica: defaultFontDescriptors,
+        Times: defaultFontDescriptors,
+      },
       header: (currentPage: number, pageCount: number) => {
         return {
           text: `IEEE TRANSACTIONS ON SOFTWARE ENGINEERING & CAPSTONE SPECIFICATIONS • ${doc.documentMode.toUpperCase()}`,
@@ -145,7 +167,26 @@ export function generateIEEEDocumentPDF(doc: IEEEDocumentObject, onlyPage1: bool
           // SECTION IV: ARCHITECTURE & SQL DDL
           { text: `IV. ${doc.page2.sectionIV_ArchitectureAndDataFlow.title.toUpperCase()}`, fontSize: 10, bold: true, margin: [0, 4, 0, 4] },
           { text: `Architectural Pattern: ${doc.page2.sectionIV_ArchitectureAndDataFlow.architecturePattern}`, fontSize: 8.5, bold: true, margin: [0, 0, 0, 4] },
-          { text: doc.page2.sectionIV_ArchitectureAndDataFlow.componentTopology, fontSize: 8, margin: [0, 0, 0, 6] },
+          { text: doc.page2.sectionIV_ArchitectureAndDataFlow.componentTopology, fontSize: 8, margin: [0, 0, 0, 4] },
+          {
+            table: {
+              widths: ['*'],
+              body: [
+                [
+                  {
+                    fillColor: '#F8F9FA',
+                    margin: [6, 4, 6, 4],
+                    stack: [
+                      { text: 'FIGURE 1: ARCHITECTURE TOPOLOGY SPECIFICATION (Mermaid.js)', fontSize: 7, bold: true, color: '#333333' },
+                      { text: doc.page2.sectionIV_ArchitectureAndDataFlow.mermaidDiagram || 'graph TD\n  Client --> Gateway --> Workers --> DB', fontSize: 6.5, color: '#444444' }
+                    ]
+                  }
+                ]
+              ]
+            },
+            layout: 'noBorders',
+            margin: [0, 0, 0, 6]
+          },
           {
             table: {
               widths: ['*'],
